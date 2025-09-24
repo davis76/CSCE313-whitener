@@ -20,18 +20,11 @@ using namespace std;
 
 
 int main (int argc, char *argv[]) {
-	
+
 	// adding fork functionality
 	if(fork() == 0) {
 		char* args[] = {(char*)"./server", nullptr};
 		execvp(args[0], args);
-
-		FIFORequestChannel chan("control", FIFORequestChannel::SERVER_SIDE);
-		
-		MESSAGE_TYPE m = QUIT_MSG;
-    	chan.cwrite(&m, sizeof(MESSAGE_TYPE));
-
-		wait(nullptr);
 	}
 
 	int opt;
@@ -58,17 +51,35 @@ int main (int argc, char *argv[]) {
 	}
 
     FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
-	
-	// example data point request
-    char buf[MAX_MESSAGE]; // 256
-    datamsg x(1, 0.0, 1);
-	
-	memcpy(buf, &x, sizeof(datamsg));
-	chan.cwrite(buf, sizeof(datamsg)); // question
-	double reply;
-	chan.cread(&reply, sizeof(double)); //answer
-	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
-	
+
+	// making csv
+	ofstream output("x1.csv");
+
+	// preveting errors
+	datamsg error_preventer(p, t, e);
+
+	char buf[MAX_MESSAGE]; // 256
+
+	// getting 1000 points
+	for (int i = 0; i < 10; ++i) {
+		double time = i * .004;
+
+		datamsg one(p, time, 1);
+		memcpy(buf, &one, sizeof(datamsg));
+		chan.cwrite(buf, sizeof(datamsg)); // question
+		double ecg1;
+		chan.cread(&ecg1, sizeof(double)); //answer
+
+		datamsg two(p, time, 2);
+		memcpy(buf, &two, sizeof(datamsg));
+		chan.cwrite(buf, sizeof(datamsg)); // question
+		double ecg2;
+		chan.cread(&ecg2, sizeof(double)); //answer
+		
+		output << time << "," << ecg1 << "," << ecg2 << "\n";
+	}
+	output.close();
+
     // sending a non-sense message, you need to change this
 	filemsg fm(0, 0);
 	string fname = "teslkansdlkjflasjdf.dat";
@@ -84,4 +95,6 @@ int main (int argc, char *argv[]) {
 	// closing the channel    
     MESSAGE_TYPE m = QUIT_MSG;
     chan.cwrite(&m, sizeof(MESSAGE_TYPE));
+
+	wait(NULL);
 }
