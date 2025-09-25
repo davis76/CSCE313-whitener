@@ -33,6 +33,7 @@ int main (int argc, char *argv[]) {
 	int e = 1;
 	
 	string filename = "";
+
 	while ((opt = getopt(argc, argv, "p:t:e:f:")) != -1) {
 		switch (opt) {
 			case 'p':
@@ -53,15 +54,24 @@ int main (int argc, char *argv[]) {
     FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
 
 	// making csv
-	ofstream output("x1.csv");
+	ofstream output("received/x1.csv");
 
 	// preveting errors
-	datamsg error_preventer(p, t, e);
+	// datamsg error_preventer(p, t, e);
 
 	char buf[MAX_MESSAGE]; // 256
 
+	// getting single data point
+    datamsg x(p, t, e);
+	
+	memcpy(buf, &x, sizeof(datamsg));
+	chan.cwrite(buf, sizeof(datamsg)); // question
+	double reply;
+	chan.cread(&reply, sizeof(double)); //answer
+	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+
 	// getting 1000 points
-	for (int i = 0; i < 10; ++i) {
+	for (int i = 0; i < 1000; ++i) {
 		double time = i * .004;
 
 		datamsg one(p, time, 1);
@@ -80,21 +90,59 @@ int main (int argc, char *argv[]) {
 	}
 	output.close();
 
-    // sending a non-sense message, you need to change this
-	filemsg fm(0, 0);
-	string fname = "teslkansdlkjflasjdf.dat";
-	
-	int len = sizeof(filemsg) + (fname.size() + 1);
-	char* buf2 = new char[len];
-	memcpy(buf2, &fm, sizeof(filemsg));
-	strcpy(buf2 + sizeof(filemsg), fname.c_str());
-	chan.cwrite(buf2, len);  // I want the file length;
+    if (!filename.empty()) {
+		filemsg fm(0, 0);
 
-	delete[] buf2;
+		__int64_t file_length;
+
+		int len = sizeof(filemsg) + (filename.size() + 1);
+		char* buf2 = new char[len];
+		memcpy(buf2, &fm, sizeof(filemsg));
+		strcpy(buf2 + sizeof(filemsg), filename.c_str());
+		chan.cwrite(buf2, len);  // I want the file length;
+		chan.cread(&file_length, sizeof(__int64_t)); // store length in file_length
+		cout << file_length;
+
+		delete[] buf2;
+
+		ofstream file_output("received/" + filename);
+		int file_chunk = MAX_MESSAGE;
+		int file_offset = 0;
+		// holds file chunk
+		char* data_chunk = new char[MAX_MESSAGE];
+
+		while(file_offset < file_length) {
+			int msg_size;
+			// condition for if message is smaller than 256 bytes
+			if (file_offset + file_chunk > file_length) {
+				msg_size = file_length - file_offset;
+			}
+			else {
+				msg_size = file_chunk;
+			}
+
+			filemsg fm(file_offset, msg_size);
+
+			int len = sizeof(filemsg) + (filename.size() + 1);
+			char* buf2 = new char[len];
+			memcpy(buf2, &fm, sizeof(filemsg));
+			strcpy(buf2 + sizeof(filemsg), filename.c_str());
+			chan.cwrite(buf2, len); 
+
+			chan.cread(data_chunk, msg_size);
+			file_output.write(data_chunk, msg_size);
+			file_offset += file_chunk;
+
+			delete[] buf2;
+		}
+
+		file_output.close();
+		delete[] data_chunk;
+	}
 	
 	// closing the channel    
     MESSAGE_TYPE m = QUIT_MSG;
     chan.cwrite(&m, sizeof(MESSAGE_TYPE));
 
-	wait(NULL);
+	wait(nullptr);
 }
