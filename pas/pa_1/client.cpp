@@ -31,10 +31,11 @@ int main (int argc, char *argv[]) {
 	int p = 1;
 	double t = 0.0;
 	int e = 1;
+	bool new_channel = false;
 	
 	string filename = "";
 
-	while ((opt = getopt(argc, argv, "p:t:e:f:")) != -1) {
+	while ((opt = getopt(argc, argv, "p:t:e:f:c")) != -1) {
 		switch (opt) {
 			case 'p':
 				p = atoi (optarg);
@@ -48,11 +49,23 @@ int main (int argc, char *argv[]) {
 			case 'f':
 				filename = optarg;
 				break;
+			case 'c':
+				new_channel = true;
+				break;
 		}
 	}
 
     FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
 
+	if (new_channel) {
+		MESSAGE_TYPE msg = NEWCHANNEL_MSG;
+		chan.cwrite(&msg, sizeof(MESSAGE_TYPE));
+		char new_channel_name[30];
+		chan.cread(new_channel_name, sizeof(new_channel_name));
+
+		FIFORequestChannel new_chan(new_channel_name, FIFORequestChannel::CLIENT_SIDE);
+	}
+	
 	// making csv
 	ofstream output("received/x1.csv");
 
