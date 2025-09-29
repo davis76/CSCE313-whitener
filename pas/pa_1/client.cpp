@@ -55,15 +55,20 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
-    FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
+    FIFORequestChannel control_chan("control", FIFORequestChannel::CLIENT_SIDE);
+	FIFORequestChannel* chan;
 
+	// requesting new channel
 	if (new_channel) {
 		MESSAGE_TYPE msg = NEWCHANNEL_MSG;
-		chan.cwrite(&msg, sizeof(MESSAGE_TYPE));
-		char new_channel_name[30];
-		chan.cread(new_channel_name, sizeof(new_channel_name));
+		control_chan.cwrite(&msg, sizeof(MESSAGE_TYPE));
+		char new_channel_name[50];
+		int bytes_read = control_chan.cread(new_channel_name, sizeof(new_channel_name));
+		new_channel_name[bytes_read] = '\0';
 
-		FIFORequestChannel new_chan(new_channel_name, FIFORequestChannel::CLIENT_SIDE);
+		chan = new FIFORequestChannel(new_channel_name, FIFORequestChannel::CLIENT_SIDE);
+	} else {
+		chan = &control_chan;
 	}
 	
 	// making csv
@@ -78,26 +83,26 @@ int main (int argc, char *argv[]) {
     datamsg x(p, t, e);
 	
 	memcpy(buf, &x, sizeof(datamsg));
-	chan.cwrite(buf, sizeof(datamsg)); // question
+	chan->cwrite(buf, sizeof(datamsg)); // question
 	double reply;
-	chan.cread(&reply, sizeof(double)); //answer
+	chan->cread(&reply, sizeof(double)); //answer
 	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
 
 	// getting 1000 points
-	for (int i = 0; i < 1000; ++i) {
+	for (int i = 0; i < 0; ++i) {
 		double time = i * .004;
 
 		datamsg one(p, time, 1);
 		memcpy(buf, &one, sizeof(datamsg));
-		chan.cwrite(buf, sizeof(datamsg)); // question
+		chan->cwrite(buf, sizeof(datamsg)); // question
 		double ecg1;
-		chan.cread(&ecg1, sizeof(double)); //answer
+		chan->cread(&ecg1, sizeof(double)); //answer
 
 		datamsg two(p, time, 2);
 		memcpy(buf, &two, sizeof(datamsg));
-		chan.cwrite(buf, sizeof(datamsg)); // question
+		chan->cwrite(buf, sizeof(datamsg)); // question
 		double ecg2;
-		chan.cread(&ecg2, sizeof(double)); //answer
+		chan->cread(&ecg2, sizeof(double)); //answer
 		
 		output << time << "," << ecg1 << "," << ecg2 << "\n";
 	}
@@ -112,8 +117,8 @@ int main (int argc, char *argv[]) {
 		char* buf2 = new char[len];
 		memcpy(buf2, &fm, sizeof(filemsg));
 		strcpy(buf2 + sizeof(filemsg), filename.c_str());
-		chan.cwrite(buf2, len);  // I want the file length;
-		chan.cread(&file_length, sizeof(__int64_t)); // store length in file_length
+		chan->cwrite(buf2, len);  // I want the file length;
+		chan->cread(&file_length, sizeof(__int64_t)); // store length in file_length
 		cout << file_length;
 
 		delete[] buf2;
@@ -140,9 +145,9 @@ int main (int argc, char *argv[]) {
 			char* buf2 = new char[len];
 			memcpy(buf2, &fm, sizeof(filemsg));
 			strcpy(buf2 + sizeof(filemsg), filename.c_str());
-			chan.cwrite(buf2, len); 
+			chan->cwrite(buf2, len); 
 
-			chan.cread(data_chunk, msg_size);
+			chan->cread(data_chunk, msg_size);
 			file_output.write(data_chunk, msg_size);
 			file_offset += file_chunk;
 
@@ -153,9 +158,17 @@ int main (int argc, char *argv[]) {
 		delete[] data_chunk;
 	}
 	
-	// closing the channel    
+	// closing the channel / channels if new channel is used  
     MESSAGE_TYPE m = QUIT_MSG;
-    chan.cwrite(&m, sizeof(MESSAGE_TYPE));
+
+	if (new_channel) {
+		chan->cwrite(&m, sizeof(MESSAGE_TYPE));
+	}
+	control_chan.cwrite(&m, sizeof(MESSAGE_TYPE));
+	
+	if (new_channel) {
+		delete chan;
+	}
 
 	wait(nullptr);
 }
