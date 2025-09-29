@@ -1,0 +1,14 @@
+NO TRANSFER - 0.230s
+
+Truncate command used to generate files
+
+10MB - 2.698s
+20MB - 4.568s
+30MB - 5.692s
+40MB - 7.300s
+50MB - 8.481s
+100MB - 16.874s
+
+1. This trend appears to make sense. It seems to be relatively linear with the size of the files.
+
+2. I believe the main bottleneck here is the buffer size of 256 bytes. The client has to make a ton of calls to get the file content.
