@@ -89,7 +89,7 @@ int main (int argc, char *argv[]) {
 	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
 
 	// getting 1000 points
-	for (int i = 0; i < 0; ++i) {
+	for (int i = 0; i < 1000; ++i) {
 		double time = i * .004;
 
 		datamsg one(p, time, 1);
